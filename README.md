@@ -14,8 +14,13 @@ Pick a track, press play (or <kbd>Space</kbd>), and move the sliders: changes ap
 Settings live in the URL hash (`#lofi?bpm=70&vinyl=0.9`), so a link reproduces what you hear.
 Double-click a slider row to reset that one parameter.
 
+**Downloads** (<kbd>D</kbd>): any track with your settings as a 48 kHz WAV, rendered in the browser. Pick a length
+(whole loops, with optional fades) or a seamless loop for games and streams; turn on stems (drums, bass, chords, melody,
+ambience plus the mix, as a ZIP) or voice-over space (speech-friendly EQ, leveled lower). Files are leveled to −14 LUFS
+(−20 with voice-over), peaks capped at −1 dBFS, and carry title, artist, license and the settings link as metadata.
+
 Keys: <kbd>Space</kbd> play / pause, <kbd>Esc</kbd> stop, arrows change track, <kbd>[</kbd> <kbd>]</kbd> previous / next loop,
-<kbd>V</kbd> switch visualizer, <kbd>C</kbd> copy share link. Drag the dot on the progress bar to jump within the loop.
+<kbd>V</kbd> switch visualizer, <kbd>D</kbd> download, <kbd>C</kbd> copy share link. Drag the dot on the progress bar to jump within the loop.
 Tracks vary from one time round to the next (parts join later, motifs mutate), which is why loops can be skipped too.
 
 ## Tracks
@@ -54,6 +59,8 @@ The site is everything in `public/`:
   16ths), `defaults` (overrides for the Mix params, e.g. tempo) and `params` (its own sliders), optionally `loops`
   (`{ intro, period }`: how its loops repeat) and `bar` (16ths per bar, if not 16), plus
   `play(v, step, time, loop, p)`, which is called for every 16th note and schedules whatever sounds then.
+- `public/download.js` — downloads: plans the render (length or seamless loop), levels it, fades, names and tags it.
+- `public/files.js` — hand-written WAV (with metadata) and ZIP writers and a loudness meter (EBU R128), so no libraries.
 - `public/viz.js` — the player's visualizers (piano roll, step grid, chords, spectrum, waveform), fed by every note the engine plays.
 - `public/index.html` — the player UI; builds sliders from each track's `params`.
 

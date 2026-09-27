@@ -12,13 +12,41 @@ export const COMMON = {
   tone: { label: "Brightness", min: 0, max: 1, step: .01, value: 1 },
   reverb: { label: "Reverb", min: 0, max: 2, step: .01, value: 1 },
   echo: { label: "Echo", min: 0, max: 2, step: .01, value: 1 },
+  voiceOver: { label: "Voice-over space", min: 0, max: 1, step: 1, value: 0 },
+};
+
+// Voice-over space: dips the frequencies speech lives in, so a voice sits on top of the music.
+export function voiceEq(ac) {
+  const a = ac.createBiquadFilter(), b = ac.createBiquadFilter();
+  a.type = b.type = "peaking";
+  a.frequency.value = 2500; a.Q.value = .9;
+  b.frequency.value = 1000; b.Q.value = 1;
+  a.connect(b);
+  return {
+    input: a, output: b,
+    set(on, now) { a.gain.setTargetAtTime(on ? -5 : 0, now, .05); b.gain.setTargetAtTime(on ? -2 : 0, now, .05); },
+  };
+}
+export const toneHz = (x) => 250 * (20000 / 250) ** x; // Brightness param -> low-pass cutoff
+
+// Stems for downloads: every sound belongs to one.
+export const STEMS = ["drums", "bass", "chords", "melody", "ambience"];
+const stemOf = (kind) => kind === "bed" ? "ambience" : { chords: "chords", keys: "chords", lead: "melody", bass: "bass" }[LANES[kind]] || "drums";
+
+// Small seeded random generator (mulberry32), so offline renders come out identical every time.
+const seeded = (a) => () => {
+  a = (a + 0x6d2b79f5) | 0;
+  let t = Math.imul(a ^ (a >>> 15), 1 | a);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 2 ** 32;
 };
 
 // Which visualizer lane each melodic instrument draws in; everything else counts as drums.
 const LANES = { pad: "chords", power: "chords", brass: "lead", wah: "keys", piano: "keys", keys: "keys", guitar: "keys", pluck: "lead", bell: "lead", flute: "lead", lead: "lead", glide: "lead", bass: "bass" };
 
 // A small synth rack for one track, feeding `out`. `v.S` (length of a 16th note) is kept current by the Player.
-export function instruments(ac, out) {
+// `random` replaces Math.random (for repeatable renders); `only`, a Set of stem names, silences everything else.
+export function instruments(ac, out, { random = Math.random, only } = {}) {
   const gain = (v) => { const g = ac.createGain(); g.gain.value = v; return g; };
   const filter = (type, freq, q = .7) => { const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q; return f; };
   const osc = (type, freq, t, end, dest) => {
@@ -28,9 +56,9 @@ export function instruments(ac, out) {
   };
   const noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
   const nd = noiseBuf.getChannelData(0);
-  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  for (let i = 0; i < nd.length; i++) nd[i] = random() * 2 - 1;
   const noise = (t, end, dest) => {
-    const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true; src.connect(dest); src.start(t, Math.random() * 2);
+    const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true; src.connect(dest); src.start(t, rnd(Math.round(t * 1000)) * 2); // offset from the note time, so stems match the mix
     if (end) src.stop(end);
     return src;
   };
@@ -45,7 +73,7 @@ export function instruments(ac, out) {
   // Reverb: a decaying burst of stereo noise as the impulse response. Echo: dotted-eighth delay.
   // Each channel sends to them; `revIn` / `echoIn` scale all sends at once (the Reverb / Echo params).
   const rev = ac.createConvolver(), ir = ac.createBuffer(2, ac.sampleRate * 3, ac.sampleRate);
-  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 4; }
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (random() * 2 - 1) * (1 - i / d.length) ** 4; }
   rev.buffer = ir; rev.connect(out);
   const revIn = gain(1), echoIn = gain(1), echo = ac.createDelay(2), damp = filter("lowpass", 2500);
   revIn.connect(rev); echoIn.connect(echo);
@@ -236,12 +264,13 @@ export function instruments(ac, out) {
     },
     // Continuous noise layer (rain, hiss, room tone). Call it every step with the current level; it glides there.
     bed(name, vol, { type = "lowpass", freq = 800, q = .5 } = {}) {
+      if (only && !only.has("ambience")) return;
       let b = beds[name];
       if (!b) {
         const g = gain(0), fl = filter(type, freq, q); fl.connect(g).connect(ch.air);
         b = beds[name] = { g, src: noise(ac.currentTime, 0, fl) };
       }
-      b.g.gain.setTargetAtTime(vol, ac.currentTime, .3);
+      b.g.gain.setTargetAtTime(vol, Math.max(ac.currentTime, this.at ?? 0), .3); // `at`: the step being scheduled
     },
   };
 
@@ -258,6 +287,7 @@ export function instruments(ac, out) {
   for (const [kind, fn] of Object.entries(v)) {
     if (typeof fn !== "function" || ["fx", "dispose", "bed", "duck"].includes(kind)) continue;
     v[kind] = function (...a) {
+      if (!depth && only && !only.has(stemOf(kind))) return;
       if (!depth && v.onNote) { const e = describe(kind, a); if (e.vol > 0) v.onNote(e); }
       depth++;
       try { return fn.apply(this, a); } finally { depth--; }
@@ -284,8 +314,10 @@ export class Player {
       this.toneFilter = ac.createBiquadFilter();
       this.toneFilter.type = "lowpass"; this.toneFilter.Q.value = .5;
       const comp = ac.createDynamicsCompressor();
+      this.eq = voiceEq(ac);
       this.analyser = ac.createAnalyser(); this.analyser.fftSize = 2048;
-      this.toneFilter.connect(comp).connect(this.analyser).connect(ac.destination);
+      this.toneFilter.connect(this.eq.input);
+      this.eq.output.connect(comp).connect(this.analyser).connect(ac.destination);
     }
     this.ac.resume();
     return this.ac;
@@ -311,6 +343,7 @@ export class Player {
         const swing = s % 2 ? p.swing * v.S / 3 : 0; // delay every off-16th, up to a triplet feel
         cur.step = s % track.steps; cur.loop = variation(track, Math.floor(s / track.steps));
         this.steps.push({ t: t + swing, step: cur.step, loop: cur.loop });
+        v.at = t + swing;
         track.play(v, cur.step, t + swing, cur.loop, p);
         t += v.S; s++;
       }
@@ -329,7 +362,8 @@ export class Player {
     if (!this.cur) return;
     const { p, out, v } = this.cur, now = this.ac.currentTime;
     out.gain.setTargetAtTime(p.volume, now, .05);
-    this.toneFilter.frequency.setTargetAtTime(250 * (20000 / 250) ** p.tone, now, .05);
+    this.toneFilter.frequency.setTargetAtTime(toneHz(p.tone), now, .05);
+    this.eq.set(p.voiceOver, now);
     v.fx(p);
   }
 
@@ -341,4 +375,38 @@ export class Player {
     setTimeout(() => { out.disconnect(); v.dispose(); }, 1500);
     this.cur = null;
   }
+}
+
+// Offline rendering for downloads: the same notes, rendered faster than real time into a buffer.
+// Plays `loops` loops starting at loop number `fromLoop`, then `tail` seconds of ringing out. Returns the
+// stereo AudioBuffer. The mix is left linear (no compressor), so stems rendered with `only` add up to it.
+export async function render(track, p, { fromLoop = 0, loops = 1, tail = 0, only, sampleRate = 48000, onProgress } = {}) {
+  const S = 60 / p.bpm / 4, steps = loops * track.steps, seconds = steps * S + tail;
+  const ac = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate);
+  const tone = ac.createBiquadFilter(), eq = voiceEq(ac);
+  tone.type = "lowpass"; tone.Q.value = .5; tone.frequency.value = toneHz(p.tone);
+  tone.connect(eq.input); eq.output.connect(ac.destination); eq.set(p.voiceOver, 0);
+  const v = instruments(ac, tone, { random: seeded(1), only });
+  v.S = S; v.fx(p);
+  // Schedule a couple of seconds ahead of the renderer, pausing it every second to queue more,
+  // so a long render never holds every note of the piece at once.
+  let s = 0;
+  const schedule = (until) => {
+    for (; s < steps && s * S < until; s++) {
+      const t = s * S + (s % 2 ? p.swing * S / 3 : 0);
+      v.at = t;
+      track.play(v, s % track.steps, t, variation(track, fromLoop + Math.floor(s / track.steps)), p);
+    }
+  };
+  const every = 1;
+  const pauseAt = (t) => ac.suspend(t).then(() => {
+    schedule(t + 2); onProgress?.(t / seconds);
+    if (t + every < seconds) pauseAt(t + every);
+    ac.resume();
+  });
+  schedule(2);
+  if (every < seconds) pauseAt(every);
+  const buffer = await ac.startRendering();
+  onProgress?.(1);
+  return buffer;
 }
