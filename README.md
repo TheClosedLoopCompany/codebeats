@@ -3,8 +3,11 @@
 Background music written as code. Every track is a single JavaScript file that schedules notes on a small
 Web Audio synth rack — no samples, no audio files, no dependencies.
 
+Live at **https://codebeats.theclosedloop.co**. To run it locally, serve the folder with any static file server
+(browsers don't load ES modules from `file://`), e.g. the one built into Python:
+
 ```sh
-npm start        # or: node server.js  →  http://localhost:8787
+python3 -m http.server 8787 -d public   # → http://localhost:8787
 ```
 
 Pick a track, press play (or <kbd>Space</kbd>), and move the sliders: changes apply on the next note.
@@ -40,17 +43,18 @@ Tracks vary from one time round to the next (parts join later, motifs mutate), w
 | Triumphant | Marching band in Bb: brass fanfare, oom-pah tuba, snare rolls, glockenspiel and cymbals |
 | Troll | Sneaky tiptoeing pizzicato and a kazoo in E minor — with wrong notes, boings and honks |
 
-Calm, Energetic, Happy and Futuristic come from the background music in `connect-4-ai`.
-
 ## Layout
 
-- `engine.js` — the synth rack (pad, pluck, bell, piano, Rhodes, guitar, flute, bowed/kazoo lead, glides, sidechain ducking, distorted power chords, bass, drums, noise beds, reverb, echo,
-  tape wobble), the global Mix parameters, and the look-ahead scheduler.
-- `tracks/<name>.js` — one file per track. It exports `name`, `description`, `color`, `steps` (loop length in
-  16ths), `defaults` (overrides for the Mix params, e.g. tempo) and `params` (its own sliders), plus
-  `play(v, step, time, loop, p)`, which is called for every 16th note and schedules whatever sounds then.
-- `viz.js` — the player's visualizers (piano roll, step grid, chords, spectrum, waveform), fed by every note the engine plays.
-- `index.html` — the player UI; builds sliders from each track's `params`.
-- `server.js` — a zero-dependency static server (ES modules don't load from `file://`).
+The site is everything in `public/`:
 
-To add a track, drop a file in `tracks/` and add its name to `NAMES` in `index.html`.
+- `public/engine.js` — the synth rack (pad, pluck, bell, piano, Rhodes, guitar, flute, brass, wah, bowed/kazoo lead, glides,
+  distorted power chords, bass, drums, noise beds, sidechain ducking, reverb, echo, tape wobble), the global Mix
+  parameters, and the look-ahead scheduler.
+- `public/tracks/<name>.js` — one file per track. It exports `name`, `description`, `color`, `steps` (loop length in
+  16ths), `defaults` (overrides for the Mix params, e.g. tempo) and `params` (its own sliders), optionally `loops`
+  (`{ intro, period }`: how its loops repeat) and `bar` (16ths per bar, if not 16), plus
+  `play(v, step, time, loop, p)`, which is called for every 16th note and schedules whatever sounds then.
+- `public/viz.js` — the player's visualizers (piano roll, step grid, chords, spectrum, waveform), fed by every note the engine plays.
+- `public/index.html` — the player UI; builds sliders from each track's `params`.
+
+To add a track, drop a file in `public/tracks/` and add its name to `NAMES` in `public/index.html`.

@@ -1,9 +1,0 @@
-{
-  "name": "codebeats",
-  "private": true,
-  "type": "module",
-  "description": "Parametric background music synthesized live in the browser with Web Audio.",
-  "scripts": {
-    "start": "node server.js"
-  }
-}
