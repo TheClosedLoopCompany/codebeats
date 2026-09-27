@@ -255,7 +255,7 @@ import { COMMON, Player, variations } from "./engine.js";
 import { MODES, draw } from "./viz.js";
 import { SITE, credit, download, estimate, fmtTime, plan } from "./download.js";
 
-const NAMES = ["angry", "calm", "chill", "concentration", "creative", "energetic", "epic", "futuristic", "groovy", "happy", "island", "lofi", "meditation", "melancholic", "sad", "sleepy", "spooky", "tense", "triumphant", "troll"];
+const NAMES = ["calm", "chill", "concentration", "creative", "energetic", "epic", "futuristic", "groovy", "happy", "island", "jazz", "lofi", "meditation", "melancholic", "metal", "sleepy", "spooky", "tense", "triumphant", "troll"];
 // Retry a track once if its download fails (flaky connection or dev server); the query string is needed
 // because the browser remembers a failed import for that exact URL.
 const load = (n) => import(`./tracks/${n}.js`).catch(() => import(`./tracks/${n}.js?retry`));

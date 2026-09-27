@@ -1,4 +1,4 @@
-// Angry: drop-D metal. Distorted power chords chugging on palm mutes, a tritone that won't resolve,
+// Metal: drop-D. Distorted power chords chugging on palm mutes, a tritone that won't resolve,
 // double kick, crashes, and a screaming lead with a whammy dive on the second time round.
 const O = "open", M = "mute";
 const RIFFS = { // [16th step, note, open/mute, length in 16ths]
@@ -11,8 +11,8 @@ const BARS = ["a", "b", "a", "c", "a", "b", "a", "stop"];
 const SCREAM = [[0, 74, 6], [6, 75, 2], [8, 80, 8]]; // D, Eb, Ab: over bars 0, 2, 4
 
 export default {
-  name: "Angry",
-  description: "Drop-D metal: distorted chugging riffs, double kick, and a screaming lead with a whammy dive.",
+  name: "Metal",
+  description: "Drop-D: distorted chugging riffs, double kick, and a screaming lead with a whammy dive.",
   color: "#d23a2a",
   steps: 128,
   loops: { intro: 0, period: 2 },
