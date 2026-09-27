@@ -69,7 +69,12 @@
     background: transparent; color: var(--text); border: 1px solid var(--line);
   }
   #reset:hover { border-color: var(--accent); }
-  footer { color: var(--muted); font-size: 12.5px; margin-top: auto; padding-top: 20px; }
+  footer {
+    color: var(--muted); font-size: 12.5px; margin-top: auto; padding-top: 20px;
+    display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px;
+  }
+  footer a { color: inherit; }
+  footer a:hover { color: var(--text); }
   kbd { font: inherit; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
 
   /* Player: pinned to the bottom of the window. */
@@ -149,7 +154,8 @@
   <div id="tracks"></div>
 
   <footer>
-    <kbd>Space</kbd> play / pause · <kbd>Esc</kbd> stop · <kbd>[</kbd> <kbd>]</kbd> previous / next loop · <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> change track · <kbd>V</kbd> change visualizer · <kbd>C</kbd> copy share link
+    <span><kbd>Space</kbd> play / pause · <kbd>Esc</kbd> stop · <kbd>[</kbd> <kbd>]</kbd> previous / next loop · <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> change track · <kbd>V</kbd> change visualizer · <kbd>C</kbd> copy share link</span>
+    <span>Music <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · The Closed Loop Company</span>
   </footer>
 </main>
 
