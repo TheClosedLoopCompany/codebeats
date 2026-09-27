@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>codebeats</title>
+<meta name="description" content="Background music written as code. Tweak it, download it, free to use (CC BY 4.0).">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:title" content="codebeats: background music written as code">
+<meta property="og:description" content="Tweak it, download it, free to use (CC BY 4.0).">
+<meta property="og:image" content="https://codebeats.theclosedloop.co/og.png">
+<meta property="og:url" content="https://codebeats.theclosedloop.co">
+<meta name="twitter:card" content="summary_large_image">
 <style>
   :root {
     color-scheme: light dark;
@@ -22,10 +30,12 @@
   }
   @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } main { min-height: 0; padding-bottom: 24px; } }
   header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
-  h1 { margin: 0; font-size: 28px; letter-spacing: -.02em; }
-  h1 span { color: var(--accent); transition: color .3s; }
-  header p { margin: 0; color: var(--muted); }
-  #gh { margin-left: auto; align-self: center; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13.5px; text-decoration: none; }
+  /* Logo lockup: baseline alignment puts the mark's bottom edge on the wordmark's baseline; the tagline lines up too. */
+  h1 { margin: 0; font-size: 40px; letter-spacing: -.025em; display: flex; align-items: baseline; gap: 12px; }
+  h1 svg { height: .74em; width: auto; overflow: visible; } /* the mark only (no tile), as tall as the b and d */
+  h1 .word span { color: var(--accent); transition: color .3s; }
+  header p { margin: 0; color: var(--muted); flex: 1 1 260px; } /* wraps within its space, so the GitHub link stays top right */
+  #gh { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13.5px; text-decoration: none; }
   #gh:hover { color: var(--text); }
   #gh svg { width: 18px; height: 18px; fill: currentColor; }
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
@@ -182,7 +192,7 @@
 <div class="layout">
 <main>
   <header>
-    <h1>code<span>beats</span></h1>
+    <h1><svg viewBox="6.25 18.75 51.5 26.5" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 8.5 32 19 43M45 21 55.5 32 45 43" stroke="currentColor" stroke-width="4.5"/><g stroke-width="4"><path d="M24.5 27v10" stroke="#6fb7c9"/><path d="M29.5 21v22" stroke="#9b6cf0"/><path d="M34.5 25v14" stroke="#e07bb5"/><path d="M39.5 29v6" stroke="#f2b632"/></g></svg><span class="word">code<span>beats</span></span></h1>
     <p>Background music written as code — every sound is synthesized live in your browser.</p>
     <a id="gh" href="https://github.com/TheClosedLoopCompany/codebeats" target="_blank" rel="noopener" title="Source code on GitHub">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub
@@ -246,7 +256,10 @@ import { MODES, draw } from "./viz.js";
 import { SITE, credit, download, estimate, fmtTime, plan } from "./download.js";
 
 const NAMES = ["angry", "calm", "chill", "concentration", "creative", "energetic", "epic", "futuristic", "groovy", "happy", "island", "lofi", "meditation", "melancholic", "sad", "sleepy", "spooky", "tense", "triumphant", "troll"];
-const TRACKS = Object.fromEntries(await Promise.all(NAMES.map(async (n) => [n, (await import(`./tracks/${n}.js`)).default])));
+// Retry a track once if its download fails (flaky connection or dev server); the query string is needed
+// because the browser remembers a failed import for that exact URL.
+const load = (n) => import(`./tracks/${n}.js`).catch(() => import(`./tracks/${n}.js?retry`));
+const TRACKS = Object.fromEntries(await Promise.all(NAMES.map(async (n) => [n, (await load(n)).default])));
 const $ = (id) => document.getElementById(id);
 const ICONS = { play: '<svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg>', pause: '<svg viewBox="0 0 24 24"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"/></svg>' };
 
