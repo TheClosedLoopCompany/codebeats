@@ -1,4 +1,6 @@
-# codebeats
+<p align="center"><img src="public/favicon.svg" width="120" alt="codebeats icon"></p>
+
+<h1 align="center">codebeats</h1>
 
 Background music written as code. Every track is a single JavaScript file that schedules notes on a small
 Web Audio synth rack — no samples, no audio files, no dependencies.
@@ -7,7 +9,7 @@ Live at **https://codebeats.theclosedloop.co**. To run it locally, serve the fol
 (browsers don't load ES modules from `file://`), e.g. the one built into Python:
 
 ```sh
-python3 -m http.server 8787 -d public   # → http://localhost:8787
+python3 -m http.server 8787 -d public --protocol HTTP/1.1   # → http://localhost:8787
 ```
 
 Pick a track, press play (or <kbd>Space</kbd>), and move the sliders: changes apply on the next note.
