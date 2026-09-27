@@ -42,7 +42,7 @@ const seeded = (a) => () => {
 };
 
 // Which visualizer lane each melodic instrument draws in; everything else counts as drums.
-const LANES = { pad: "chords", power: "chords", brass: "lead", wah: "keys", piano: "keys", keys: "keys", guitar: "keys", pluck: "lead", bell: "lead", flute: "lead", lead: "lead", glide: "lead", bass: "bass" };
+const LANES = { pad: "chords", power: "chords", brass: "lead", wah: "keys", piano: "keys", keys: "keys", guitar: "keys", pluck: "lead", bell: "lead", flute: "lead", sax: "lead", lead: "lead", glide: "lead", bass: "bass", upright: "bass" };
 
 // A small synth rack for one track, feeding `out`. `v.S` (length of a 16th note) is kept current by the Player.
 // `random` replaces Math.random (for repeatable renders); `only`, a Set of stem names, silences everything else.
@@ -102,6 +102,7 @@ export function instruments(ac, out, { random = Math.random, only } = {}) {
     return Math.tanh(k * x) / Math.tanh(k);
   });
 
+  let reed = null; // the sax: one persistent voice, created on first use
   const beds = {}; // looping noise layers (rain, vinyl hiss, ...), created on first use
   let transpose = 0, lastS;
   const f = (m) => hz(m + transpose);
@@ -119,6 +120,7 @@ export function instruments(ac, out, { random = Math.random, only } = {}) {
     },
     dispose() {
       wobbleLfo.stop();
+      if (reed) { reed.node.port.postMessage("stop"); reed.node.disconnect(); }
       for (const b of Object.values(beds)) b.src.stop();
     },
 
@@ -209,6 +211,69 @@ export function instruments(ac, out, { random = Math.random, only } = {}) {
       fl.frequency.setValueAtTime(from, t); fl.frequency.exponentialRampToValueAtTime(to, t + len * .4);
       fl.frequency.exponentialRampToValueAtTime(from, t + len);
       osc(pulseWave, f(m), t, env(g, t, .004, vol, len * .6, .08), fl);
+    },
+    // Tenor sax: a breath-driven reed tone (reed.js), played like a horn. It's one monophonic voice, so a
+    // phrase is one airstream: notes that follow straight on are slurred (the pitch slides over) or, with `tongue`,
+    // articulated by a quick dip in breath; after a rest it starts from silence. `dyn` is how hard it's blown
+    // (.5 soft, subtone-ish, to 1.3 honking), which is what sets its brightness and rasp. `scoop` bends up into the
+    // note (cents), `from` slides in from another note, `fall` drops that many semitones as the note ends,
+    // `swell` grows a held note (fraction of `dyn`), `vibrato` blooms on held notes.
+    sax(t, m, len, { vol = .05, dyn = 1, breath = .3, vibrato = .6, tongue = true, scoop = 0, from, fall = 0, swell = .1 } = {}) {
+      if (!reed) {
+        let node;
+        try { node = new AudioWorkletNode(ac, "reed", { numberOfInputs: 0, outputChannelCount: [1], processorOptions: { seed: 1 + Math.floor(random() * 2 ** 30) } }); }
+        catch { return; } // the worklet isn't loaded (or supported): the sax sits this one out
+        // The horn's body: a warm low-mid bump and the nasal "honk" formant, air above 6 kHz rolled off.
+        const hp = filter("highpass", 90), body = filter("peaking", 650, .8), honk = filter("peaking", 1800, 1.4), lp = filter("lowpass", 6500);
+        body.gain.value = 3; honk.gain.value = 5;
+        reed = { node, out: gain(0), end: -1, P: node.parameters.get("pressure"), F: node.parameters.get("freq"), V: node.parameters.get("vibrato"), B: node.parameters.get("breath") };
+        node.connect(hp).connect(body).connect(honk).connect(lp).connect(reed.out).connect(ch.lead);
+      }
+      const { P, F, V, B, out } = reed, fx = f(m), end = t + len, legato = t - reed.end < .05;
+      const blow = Math.min(.9, Math.max(.5, .6 + .15 * dyn)); // silent below ~.35, full around .9
+      const bend = from !== undefined ? f(from) : scoop ? fx * 2 ** (-scoop / 1200) : 0;
+      if (legato) {
+        P.cancelScheduledValues(t - .015); F.cancelScheduledValues(t - .015); // the last note doesn't stop after all
+        if (tongue) { P.setTargetAtTime(blow * .45, t - .012, .004); P.setTargetAtTime(blow, t + .004, .01); }
+        else P.setTargetAtTime(blow, t, .02);
+        if (bend) { F.setTargetAtTime(bend, t - .004, .003); F.setTargetAtTime(fx, t + .02, .025); }
+        else F.setTargetAtTime(fx, t - .004, tongue ? .005 : .012);
+      } else {
+        F.setValueAtTime(bend || fx, t); if (bend) F.setTargetAtTime(fx, t + .01, .03);
+        P.setValueAtTime(0, t); P.setTargetAtTime(Math.min(.9, blow * 1.06), t, .01); P.setTargetAtTime(blow, t + .05, .05);
+      }
+      if (len > .4 && swell) P.setTargetAtTime(Math.min(.9, blow * (1 + swell)), t + .08, len / 2.5);
+      out.gain.setTargetAtTime(vol * 2.2, t, .02); // loudness itself comes from how hard it is blown
+      B.setTargetAtTime(breath, t, .02);
+      V.setTargetAtTime(0, t, .03);
+      if (len > .3 && vibrato) V.setTargetAtTime(vibrato * 18, t + Math.min(.3, len * .4), .15);
+      // Stop blowing at the end (cancelled if the next note carries straight on); a fall lets the pitch drop away.
+      P.setTargetAtTime(0, end, fall ? .07 : .015);
+      if (fall) F.setTargetAtTime(fx * 2 ** (-fall / 12), end - .03, .08);
+      reed.end = end;
+    },
+    // Upright bass: a plucked string, round and woody. Bright finger attack that dulls fast, a little pitch
+    // overshoot as the string is pulled, a knock of finger noise, and a note that fades while it's held.
+    upright(t, m, len, { vol = .12, bright = 1 } = {}) {
+      const g = gain(0), fl = filter("lowpass", f(m) * 8 * bright, 1.5), fx = f(m); fl.connect(g).connect(ch.bass);
+      fl.frequency.setTargetAtTime(fx * 2.2 + 80, t, .06);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .006);
+      g.gain.setTargetAtTime(vol * .45, t + .01, .18); g.gain.setTargetAtTime(0, t + len, .04);
+      const end = t + len + .2;
+      for (const [type, level] of [["triangle", 1], ["sine", .8]]) {
+        const lg = gain(level); lg.connect(fl);
+        const o = osc(type, fx, t, end, lg); o.frequency.setValueAtTime(fx * 1.012, t); o.frequency.exponentialRampToValueAtTime(fx, t + .04);
+      }
+      this.hiss(t, { vol: vol * .25 * bright, decay: .025, type: "lowpass", freq: 900, to: ch.bass });
+    },
+    // Ride cymbal: six detuned square waves at inharmonic ratios (a metal plate's clangorous partials), high-passed,
+    // with a stick "ping" on top. `bell` hits nearer the cup: louder ping, shorter wash.
+    ride(t, vol = .03, { bell = 0, decay = 1.4 } = {}) {
+      const g = gain(0), hp = filter("highpass", 5500), bp = filter("bandpass", 9000, .6); hp.connect(bp).connect(g).connect(ch.snare);
+      const end = env(g, t, .001, vol, 0, decay * (1 - bell * .5));
+      for (const r of [205.3, 304.4, 369.6, 522.7, 540, 800]) osc("square", r * 1.9, t, end, hp);
+      const ping = gain(0); ping.connect(ch.snare);
+      osc("sine", 5200 + 1800 * bell, t, env(ping, t, .001, vol * (.25 + bell * .6), 0, .12 + bell * .3), ping);
     },
     // Duck channels (sidechain "pump"): drop to 1 - depth at `t` and swell back over `len`.
     duck(t, depth, len, names = ["pad"]) {
@@ -305,6 +370,10 @@ export const variation = (track, n) => {
 };
 export const variations = (track) => track.loops ? (track.loops.intro || 0) + track.loops.period : Infinity;
 
+// The sax's tone generator runs as an AudioWorklet; each audio context loads it once before playing.
+const REED = new URL("./reed.js", import.meta.url).href;
+const loadReed = (ac) => ac.audioWorklet?.addModule(REED).catch(() => {}) ?? Promise.resolve();
+
 // Look-ahead scheduler: every 50 ms, queue the 16th-note steps due in the next 250 ms.
 // `p` is a live params object: the UI mutates it and the next scheduled step picks the change up.
 export class Player {
@@ -318,6 +387,7 @@ export class Player {
       this.analyser = ac.createAnalyser(); this.analyser.fftSize = 2048;
       this.toneFilter.connect(this.eq.input);
       this.eq.output.connect(comp).connect(this.analyser).connect(ac.destination);
+      this.ready = loadReed(ac);
     }
     this.ac.resume();
     return this.ac;
@@ -348,9 +418,14 @@ export class Player {
         t += v.S; s++;
       }
     };
-    this.update();
-    tick();
-    cur.timer = setInterval(tick, 50);
+    // Start once the worklet is in (instant after the first time), unless stopped or replaced meanwhile.
+    this.ready.then(() => {
+      if (this.cur !== cur) return;
+      t = Math.max(t, ac.currentTime + .1);
+      this.update();
+      tick();
+      cur.timer = setInterval(tick, 50);
+    });
   }
 
   // Pause freezes the audio clock itself: notes already queued wait, and carry on exactly where they were.
@@ -386,6 +461,7 @@ export async function render(track, p, { fromLoop = 0, loops = 1, tail = 0, only
   const tone = ac.createBiquadFilter(), eq = voiceEq(ac);
   tone.type = "lowpass"; tone.Q.value = .5; tone.frequency.value = toneHz(p.tone);
   tone.connect(eq.input); eq.output.connect(ac.destination); eq.set(p.voiceOver, 0);
+  await loadReed(ac);
   const v = instruments(ac, tone, { random: seeded(1), only });
   v.S = S; v.fx(p);
   // Schedule a couple of seconds ahead of the renderer, pausing it every second to queue more,
