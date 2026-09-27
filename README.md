@@ -58,3 +58,7 @@ The site is everything in `public/`:
 - `public/index.html` — the player UI; builds sliders from each track's `params`.
 
 To add a track, drop a file in `public/tracks/` and add its name to `NAMES` in `public/index.html`.
+
+## License
+
+MIT, see [LICENSE](LICENSE). The tracks are code, so the same license covers the music.
