@@ -132,12 +132,50 @@
   #vizmenu button:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
   #vizmenu button[aria-checked="true"] { color: var(--accent); font-weight: 600; }
   @media (max-width: 600px) { #scope { display: none; } #nowtext { flex: 1; } }
-  #copy {
+  #copy, #dl {
     width: 40px; height: 40px; flex: none; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--text);
     cursor: pointer; display: grid; place-items: center;
   }
-  #copy:hover { border-color: var(--accent); color: var(--accent); }
-  #copy svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  #copy:hover, #dl:hover, #dl[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+  #copy svg, #dl svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Download panel: opens upwards from the player, like the visualizer menu. */
+  #dlpick { position: relative; flex: none; }
+  #dlpanel {
+    position: absolute; right: 0; bottom: calc(100% + 8px); width: 350px; padding: 16px; font-size: 13.5px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px #0002;
+  }
+  #dlpanel[hidden] { display: none; }
+  #dlpanel h3 { margin: 0 0 12px; font-size: 15px; }
+  #dllen { display: flex; flex-wrap: wrap; gap: 4px; }
+  #dllen button {
+    font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 7px; cursor: pointer;
+    background: transparent; color: var(--text); border: 1px solid var(--line);
+  }
+  #dllen button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #dllen button:disabled { opacity: .4; cursor: default; }
+  #dlpanel .note { color: var(--muted); font-size: 12.5px; margin: 6px 0 12px; }
+  #dlpanel label { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; cursor: pointer; }
+  #dlpanel label:has(:disabled) { opacity: .45; cursor: default; }
+  #dlpanel label input { accent-color: var(--accent); }
+  #dlpanel label small { display: block; color: var(--muted); font-size: 12px; }
+  #dlgo {
+    width: 100%; margin-top: 12px; font: inherit; font-weight: 600; padding: 9px; border: 0; border-radius: 9px; cursor: pointer;
+    background: var(--accent); color: #fff;
+  }
+  #dlgo:disabled { opacity: .6; cursor: progress; }
+  #dlbar { height: 4px; margin-top: 8px; border-radius: 2px; background: var(--line); overflow: hidden; }
+  #dlbar[hidden] { display: none; }
+  #dlbar i { display: block; height: 100%; width: 0; background: var(--accent); }
+  #dlerr { color: #d23a2a; font-size: 12.5px; margin: 8px 0 0; }
+  #dlerr:empty { display: none; }
+  #dlcredit { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  #dlcredit p { margin: 4px 0 8px; font-size: 12.5px; line-height: 1.4; user-select: all; }
+  #dlcredit button {
+    font: inherit; font-size: 12.5px; padding: 4px 10px; border-radius: 7px; cursor: pointer;
+    background: transparent; color: var(--text); border: 1px solid var(--line);
+  }
+  #dlcredit button:hover { border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -154,7 +192,7 @@
   <div id="tracks"></div>
 
   <footer>
-    <span><kbd>Space</kbd> play / pause · <kbd>Esc</kbd> stop · <kbd>[</kbd> <kbd>]</kbd> previous / next loop · <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> change track · <kbd>V</kbd> change visualizer · <kbd>C</kbd> copy share link</span>
+    <span><kbd>Space</kbd> play / pause · <kbd>Esc</kbd> stop · <kbd>[</kbd> <kbd>]</kbd> previous / next loop · <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> change track · <kbd>V</kbd> change visualizer · <kbd>D</kbd> download · <kbd>C</kbd> copy share link</span>
     <span>Music <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · The Closed Loop Company</span>
   </footer>
 </main>
@@ -180,6 +218,24 @@
       <button id="viz" aria-haspopup="true" aria-expanded="false" title="Visualizer (V)"><span></span><svg viewBox="0 0 12 12"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg></button>
       <ul id="vizmenu" role="menu" hidden></ul>
     </div>
+    <div id="dlpick">
+      <button id="dl" aria-label="Download" aria-expanded="false" title="Download (D)"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7.5 10.5 12 15l4.5-4.5"/><path d="M5 19.5h14"/></svg></button>
+      <div id="dlpanel" hidden>
+        <h3>Download <span id="dltrack"></span></h3>
+        <div id="dllen">
+          <button data-min="1">1 min</button><button data-min="3">3 min</button><button data-min="5">5 min</button><button data-min="10">10 min</button><button data-min="loop">Seamless loop</button>
+        </div>
+        <p class="note" id="dlnote"></p>
+        <label><input type="checkbox" id="dlfadein"><span>Fade in</span></label>
+        <label><input type="checkbox" id="dlfadeout"><span>Fade out</span></label>
+        <label><input type="checkbox" id="dlvo"><span>Voice-over space<small>Makes room for speech: dips the voice frequencies, leveled to −20 LUFS. Also in Mix settings.</small></span></label>
+        <label><input type="checkbox" id="dlstems"><span>Stems<small>Drums, bass, chords, melody and ambience as separate files, plus the mix, in a ZIP. Up to 5 min.</small></span></label>
+        <button id="dlgo"></button>
+        <div id="dlbar" hidden><i></i></div>
+        <p id="dlerr"></p>
+        <div id="dlcredit"><b>Credit line</b> (required, CC BY 4.0)<p id="dlcredittext"></p><button id="dlcopy">Copy credit</button></div>
+      </div>
+    </div>
     <button id="copy" aria-label="Copy share link" title="Copy share link (C): it plays exactly what you hear"></button>
   </div>
 </div>
@@ -187,6 +243,7 @@
 <script type="module">
 import { COMMON, Player, variations } from "./engine.js";
 import { MODES, draw } from "./viz.js";
+import { SITE, credit, download, estimate, fmtTime, plan } from "./download.js";
 
 const NAMES = ["angry", "calm", "chill", "concentration", "creative", "energetic", "epic", "futuristic", "groovy", "happy", "island", "lofi", "meditation", "melancholic", "sad", "sleepy", "spooky", "tense", "triumphant", "troll"];
 const TRACKS = Object.fromEntries(await Promise.all(NAMES.map(async (n) => [n, (await import(`./tracks/${n}.js`)).default])));
@@ -242,7 +299,7 @@ function slider(key, spec, p, d) {
   input.oninput = () => {
     p[key] = +input.value;
     out.textContent = toggle ? (p[key] ? "on" : "off") : fmt(p[key]);
-    mark(); player.update(); writeHash();
+    mark(); player.update(); writeHash(); renderDl();
   };
   row.ondblclick = () => { input.value = d[key]; input.oninput(); }; // double-click resets one param
   mark();
@@ -256,6 +313,7 @@ function renderParams() {
 }
 
 function render() {
+  renderDl();
   const t = TRACKS[current];
   document.documentElement.style.setProperty("--accent", t.color);
   $("title").textContent = t.name;
@@ -346,10 +404,13 @@ addEventListener("keydown", (e) => {
   if (e.target.matches?.("input, button") && e.key === " ") e.preventDefault();
   const i = NAMES.indexOf(current);
   if (e.key === " ") toggle();
-  else if (e.key === "Escape") { if ($("vizmenu").hidden) select(current, "stopped"); else openMenu(false); }
+  else if (e.key === "Escape") {
+    if (!$("dlpanel").hidden) openDl(false); else if (!$("vizmenu").hidden) openMenu(false); else select(current, "stopped");
+  }
   else if (e.key === "[" || e.key === "]") jumpLoop(e.key === "]" ? 1 : -1);
   else if (e.metaKey || e.ctrlKey || e.altKey) return;
   else if (e.key.toLowerCase() === "c") $("copy").click();
+  else if (e.key.toLowerCase() === "d") openDl($("dlpanel").hidden);
   else if (e.key.toLowerCase() === "v") {
     const keys = Object.keys(MODES);
     setMode(keys[(keys.indexOf(mode) + 1) % keys.length]);
@@ -378,7 +439,74 @@ function openMenu(open) {
 $("vizmenu").innerHTML = Object.entries(MODES).map(([k, label]) => `<li><button role="menuitemradio" data-mode="${k}">${label}</button></li>`).join("");
 $("vizmenu").onclick = (e) => { const b = e.target.closest("button"); if (b) { setMode(b.dataset.mode); openMenu(false); $("viz").blur(); } };
 $("viz").onclick = () => openMenu($("vizmenu").hidden);
-addEventListener("pointerdown", (e) => { if (!$("vizpick").contains(e.target)) openMenu(false); });
+addEventListener("pointerdown", (e) => {
+  if (!$("vizpick").contains(e.target)) openMenu(false);
+  if (!$("dlpick").contains(e.target)) openDl(false);
+});
+
+// Download panel. Renders offline with the current settings (see download.js); the music keeps playing meanwhile.
+const dl = { minutes: 3, seamless: false, fadeIn: true, fadeOut: true, stems: false };
+let rendering = false;
+function openDl(open) {
+  $("dlpanel").hidden = !open;
+  $("dl").setAttribute("aria-expanded", open);
+  if (open) renderDl();
+}
+function renderDl() {
+  if ($("dlpanel").hidden) return;
+  const t = TRACKS[current], p = state[current];
+  if (dl.seamless && !t.loops) dl.seamless = false;
+  if (dl.stems && !dl.seamless && dl.minutes > 5) dl.minutes = 5;
+  $("dltrack").textContent = t.name;
+  for (const b of $("dllen").children) {
+    const loop = b.dataset.min === "loop";
+    b.setAttribute("aria-pressed", loop ? dl.seamless : !dl.seamless && +b.dataset.min === dl.minutes);
+    b.disabled = loop ? !t.loops : dl.stems && +b.dataset.min > 5;
+    if (loop) b.title = t.loops ? "One full cycle that repeats without a seam, for games and streams" : `${t.name} never repeats, so there's no seamless loop`;
+  }
+  const pl = plan(t, p, dl), loops = pl.loops / (dl.seamless ? 2 : 1);
+  $("dlnote").textContent = `${fmtTime(pl.seconds)} · ` +
+    (dl.seamless ? `${loops} loop${loops > 1 ? "s" : ""} that repeat without a seam` : `${loops} loop${loops > 1 ? "s" : ""}, ends on a full loop`);
+  $("dlfadein").checked = dl.fadeIn && !dl.seamless; $("dlfadein").disabled = dl.seamless;
+  $("dlfadeout").checked = dl.fadeOut && !dl.seamless; $("dlfadeout").disabled = dl.seamless;
+  $("dlvo").checked = !!p.voiceOver;
+  $("dlstems").checked = dl.stems;
+  $("dlgo").disabled = rendering;
+  if (!rendering) $("dlgo").textContent = `Download ${dl.stems ? "stems (ZIP)" : "WAV"} · ~${Math.max(1, Math.round(estimate(t, p, dl)))} MB`;
+  $("dlcredittext").textContent = credit(t);
+}
+$("dl").onclick = () => openDl($("dlpanel").hidden);
+$("dllen").onclick = (e) => {
+  const b = e.target.closest("button");
+  if (!b || b.disabled) return;
+  dl.seamless = b.dataset.min === "loop";
+  if (!dl.seamless) dl.minutes = +b.dataset.min;
+  renderDl();
+};
+$("dlfadein").onchange = () => { dl.fadeIn = $("dlfadein").checked; renderDl(); };
+$("dlfadeout").onchange = () => { dl.fadeOut = $("dlfadeout").checked; renderDl(); };
+$("dlstems").onchange = () => { dl.stems = $("dlstems").checked; renderDl(); };
+$("dlvo").onchange = () => { // the same setting as "Voice-over space" in Mix, so it's audible right away
+  state[current].voiceOver = $("dlvo").checked ? 1 : 0;
+  player.update(); renderParams(); writeHash(); renderDl();
+};
+$("dlgo").onclick = async () => {
+  rendering = true; $("dlerr").textContent = ""; $("dlbar").hidden = false; $("dlbar").firstChild.style.width = "0";
+  $("dlgo").textContent = "Rendering…"; renderDl();
+  try {
+    await download(TRACKS[current], { ...state[current] }, {
+      ...dl, link: SITE + location.hash,
+      onProgress: (f) => { $("dlbar").firstChild.style.width = `${f * 100}%`; $("dlgo").textContent = `Rendering… ${Math.round(f * 100)}%`; },
+    });
+  } catch (err) {
+    $("dlerr").textContent = `Couldn't render: ${err.message}`;
+  }
+  rendering = false; $("dlbar").hidden = true; renderDl();
+};
+$("dlcopy").onclick = async () => {
+  await navigator.clipboard.writeText(credit(TRACKS[current]));
+  $("dlcopy").textContent = "Copied"; setTimeout(() => $("dlcopy").textContent = "Copy credit", 1500);
+};
 setMode(mode);
 select(readHash(), "stopped"); // pick the initial track before the first frame draws
 
