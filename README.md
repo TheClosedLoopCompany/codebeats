@@ -61,4 +61,10 @@ To add a track, drop a file in `public/tracks/` and add its name to `NAMES` in `
 
 ## License
 
-MIT, see [LICENSE](LICENSE). The tracks are code, so the same license covers the music.
+- **The music** — the tracks in [`public/tracks/`](public/tracks/) — is licensed under
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) ([full text](public/tracks/LICENSE)). Use it anywhere,
+  including recordings in videos, streams, games and remixes, commercially too, as long as you give credit, e.g.:
+
+  > Music: "Lo-fi" from codebeats by The Closed Loop Company (https://codebeats.theclosedloop.co), CC BY 4.0
+
+- **Everything else** (the synth engine, player and visualizers) is [MIT](LICENSE).
