@@ -1,8 +1,6 @@
 <p align="center"><img src="public/favicon.svg" width="120" alt="codebeats icon"></p>
 
-<h1 align="center">codebeats</h1>
-
-<p align="center"><a href="https://codebeats.theclosedloop.co"><b>https://codebeats.theclosedloop.co</b></a></p>
+<h1 align="center">codebeats<br><sub><a href="https://codebeats.theclosedloop.co">codebeats.theclosedloop.co</a></sub></h1>
 
 Background music written as code. Every track is a single JavaScript file that schedules notes on a small
 Web Audio synth rack — no samples, no audio files, no dependencies.
