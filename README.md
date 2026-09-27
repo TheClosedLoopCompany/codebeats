@@ -2,10 +2,12 @@
 
 <h1 align="center">codebeats</h1>
 
+<p align="center"><a href="https://codebeats.theclosedloop.co"><b>https://codebeats.theclosedloop.co</b></a></p>
+
 Background music written as code. Every track is a single JavaScript file that schedules notes on a small
 Web Audio synth rack — no samples, no audio files, no dependencies.
 
-Live at **https://codebeats.theclosedloop.co**. To run it locally, serve the folder with any static file server
+To run it locally, serve the folder with any static file server
 (browsers don't load ES modules from `file://`), e.g. the one built into Python:
 
 ```sh
