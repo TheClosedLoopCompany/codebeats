@@ -187,11 +187,11 @@
   }
   #dlcredit button:hover { border-color: var(--accent); }
 
-  /* Phones: the GitHub logo sits next to the wordmark so the tagline gets the full width; no keyboard shortcuts,
+  /* Phones: the GitHub logo shares the wordmark's line (at the right) so the tagline gets the full width; no keyboard shortcuts,
      visualizer or downloads. The loop switcher takes their place in the player row, with finger-sized buttons. */
   @media (max-width: 600px), (pointer: coarse) and (max-width: 900px) {
     header { align-items: center; }
-    #gh { order: 1; margin-left: 0; }
+    #gh { order: 1; }
     #gh span { display: none; }
     #gh svg { width: 22px; height: 22px; }
     header p { order: 2; flex-basis: 100%; }
