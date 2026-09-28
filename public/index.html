@@ -186,6 +186,22 @@
     background: transparent; color: var(--text); border: 1px solid var(--line);
   }
   #dlcredit button:hover { border-color: var(--accent); }
+
+  /* Phones: the GitHub logo shares the wordmark's line (at the right) so the tagline gets the full width; no keyboard shortcuts,
+     visualizer or downloads. The loop switcher takes their place in the player row, with finger-sized buttons. */
+  @media (max-width: 600px), (pointer: coarse) and (max-width: 900px) {
+    header { align-items: center; }
+    #gh { order: 1; }
+    #gh span { display: none; }
+    #gh svg { width: 22px; height: 22px; }
+    header p { order: 2; flex-basis: 100%; }
+    #keys, #scope, #vizpick, #dlpick { display: none; }
+    #player .inner { padding: 12px 16px; gap: 12px; }
+    #nowtext { display: contents; }
+    #title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    #loopctl { flex: 1; justify-content: center; gap: 8px; margin: 0; font-size: 13.5px; white-space: nowrap; }
+    #loopctl button { width: 40px; height: 40px; font-size: 22px; border: 1px solid var(--line); border-radius: 10px; }
+  }
 </style>
 </head>
 <body>
@@ -195,14 +211,14 @@
     <h1><svg viewBox="6.25 18.75 51.5 26.5" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21 8.5 32 19 43M45 21 55.5 32 45 43" stroke="currentColor" stroke-width="4.5"/><g stroke-width="4"><path d="M24.5 27v10" stroke="#6fb7c9"/><path d="M29.5 21v22" stroke="#9b6cf0"/><path d="M34.5 25v14" stroke="#e07bb5"/><path d="M39.5 29v6" stroke="#f2b632"/></g></svg><span class="word">code<span>beats</span></span></h1>
     <p>Background music written as code — every sound is synthesized live in your browser.</p>
     <a id="gh" href="https://github.com/TheClosedLoopCompany/codebeats" target="_blank" rel="noopener" title="Source code on GitHub">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span>GitHub</span>
     </a>
   </header>
 
   <div id="tracks"></div>
 
   <footer>
-    <span><kbd>Space</kbd> play / pause · <kbd>Esc</kbd> stop · <kbd>[</kbd> <kbd>]</kbd> previous / next loop · <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> change track · <kbd>V</kbd> change visualizer · <kbd>D</kbd> download · <kbd>C</kbd> copy share link</span>
+    <span id="keys"><kbd>Space</kbd> play / pause · <kbd>Esc</kbd> stop · <kbd>[</kbd> <kbd>]</kbd> previous / next loop · <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> change track · <kbd>V</kbd> change visualizer · <kbd>D</kbd> download · <kbd>C</kbd> copy share link</span>
     <span>Music <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · The Closed Loop Company</span>
   </footer>
 </main>
@@ -527,7 +543,7 @@ select(readHash(), "stopped"); // pick the initial track before the first frame 
   requestAnimationFrame(frame);
   const dpr = devicePixelRatio, w = cv.width = cv.clientWidth * dpr, h = cv.height = cv.clientHeight * dpr;
   const color = (v) => css.getPropertyValue(v).trim();
-  draw(mode, g, w, h, player, status !== "stopped", { dpr, accent: color("--accent"), text: color("--text"), muted: color("--muted"), line: color("--line") });
+  if (w) draw(mode, g, w, h, player, status !== "stopped", { dpr, accent: color("--accent"), text: color("--text"), muted: color("--muted"), line: color("--line") }); // w = 0: hidden on phones
   // Progress follows the audio clock: the step that's sounding now plus how far into it we are.
   // (cur.step is the step being *scheduled*, ~250 ms ahead, and only moves in 16th-note jumps.)
   const pos = position(), at = drag ?? (pos ? (pos.step + pos.frac) / TRACKS[current].steps : 0);
