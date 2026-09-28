@@ -188,7 +188,7 @@
   #dlcredit button:hover { border-color: var(--accent); }
 
   /* Phones: the GitHub logo sits next to the wordmark so the tagline gets the full width; no keyboard shortcuts,
-     visualizer or downloads. The seek bar moves into the player row, between the title and the share button. */
+     visualizer or downloads. The loop switcher takes their place in the player row, with finger-sized buttons. */
   @media (max-width: 600px), (pointer: coarse) and (max-width: 900px) {
     header { align-items: center; }
     #gh { order: 1; margin-left: 0; }
@@ -196,17 +196,11 @@
     #gh svg { width: 22px; height: 22px; }
     header p { order: 2; flex-basis: 100%; }
     #keys, #scope, #vizpick, #dlpick { display: none; }
-    #player { display: flex; align-items: center; gap: 14px; padding: 12px 16px; }
-    #player .inner { display: contents; }
-    #play { order: 1; }
-    #nowtext { order: 2; flex: 0 1 auto; max-width: 40%; }
-    #progress { order: 3; flex: 1; height: 5px; border-radius: 3px; }
-    #progress:hover, #progress.dragging { height: 5px; margin-bottom: 0; }
-    #progress::after { inset: -16px 0; } /* a finger-sized hit area */
-    #progress i { border-radius: 3px; }
-    #knob, #progress:hover #knob { width: 16px; height: 16px; }
-    #progress.dragging #knob { width: 20px; height: 20px; }
-    #copy { order: 4; }
+    #player .inner { padding: 12px 16px; gap: 12px; }
+    #nowtext { display: contents; }
+    #title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    #loopctl { flex: 1; justify-content: center; gap: 8px; margin: 0; font-size: 13.5px; white-space: nowrap; }
+    #loopctl button { width: 40px; height: 40px; font-size: 22px; border: 1px solid var(--line); border-radius: 10px; }
   }
 </style>
 </head>
