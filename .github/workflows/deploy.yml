@@ -17,7 +17,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # No Cloudflare credential is stored in GitHub: the tclc-github-actions
       # identity trades GitHub's OIDC token for CLOUDFLARE_API_TOKEN from
