@@ -174,6 +174,10 @@ function guide(map, fromBar, toBar) {
 
 // Sax articulation, the way swing is phrased: tongue the offbeats and slur them into the next downbeat
 // ("doo-BAH"), slur within triplet turns, tongue anything after a gap. Held notes often scoop up into pitch.
+// Then the dynamics, on three levels. Each phrase (notes with no more than a short breath between them) has its
+// own level, from almost spoken to pushed hard, and an arc: it grows toward its highest note and eases off after.
+// In a run, a note dipping below its neighbours is ghosted, swallowed more than played. Held notes breathe: they
+// swell, and some die away again before the end (always the last note of a phrase, unless it falls off).
 function phrase(map, seed) {
   const r = stream(seed), notes = [...map.values()].flat().filter((ev) => ev.voice === "sax").sort((a, b) => a.e - b.e);
   notes.forEach((ev, k) => {
@@ -181,6 +185,21 @@ function phrase(map, seed) {
     ev.tongue = !joined || ev.sw || !(prev.sw || prev.len8 < 1) || ev.len8 > 2;
     ev.scoop = (ev.len8 >= 3 || !joined) && r() < .55 ? 40 + 50 * r() : 0;
   });
+  const phrases = [];
+  notes.forEach((ev, k) => (k && ev.e - notes[k - 1].e - notes[k - 1].len8 < 1.5 ? phrases.at(-1).push(ev) : phrases.push([ev])));
+  for (const ph of phrases) {
+    const level = .82 + .36 * r(), peak = ph.reduce((b, ev, k) => (ev.m > ph[b].m ? k : b), 0);
+    ph.forEach((ev, k) => {
+      const toPeak = peak ? k / peak : 1, after = k > peak ? (k - peak) / (ph.length - peak) : 0;
+      ev.shape = level * (.86 + .2 * Math.min(toPeak, 1) - .16 * after);
+      const [a, b] = [ph[k - 1], ph[k + 1]];
+      if (!ev.soft && ev.len8 <= 1 && a && b && ev.m < a.m && ev.m < b.m && r() < (ev.head ? .35 : .6)) ev.shape *= .5;
+      const last = k === ph.length - 1;
+      ev.vib = ev.soft || r() < .35 ? 0 : .8 + .4 * r(); // some held notes stay straight
+      ev.swell = ev.soft ? .05 : ev.len8 >= 2 ? .08 + .14 * r() : .12;
+      ev.taper = ev.soft ? .25 : ev.len8 < 2 || ev.fall ? 0 : last || r() < .4 ? .3 + .3 * r() : 0;
+    });
+  }
 }
 
 // The three times round: head, sax solo, piano solo (sax back in for the last A).
@@ -216,8 +235,8 @@ export default {
       const t0 = t + (ev.sw ? d : 0) + ev.off * v.S, len = ev.len * v.S + (ev.swEnd ? d : 0) - (ev.sw ? d : 0);
       // Sax: laid back behind the beat, never quite the same amount twice.
       if (ev.voice === "sax") v.sax(t0 + .014 + .008 * (rnd(ev.e * 97 + ev.m) - .5), ev.m, len, {
-        vol: .05 * ev.acc * p.sax, dyn: ev.acc * (ev.soft ? .55 : 1), breath: p.breath * (ev.soft ? 1.5 : 1), vibrato: p.vibrato,
-        tongue: ev.tongue, scoop: ev.scoop, fall: ev.fall, swell: ev.soft ? .05 : .12,
+        vol: .05 * p.sax, dyn: ev.acc * ev.shape * (ev.soft ? .7 : 1), breath: p.breath * (ev.soft ? 1.5 : 1), vibrato: p.vibrato * ev.vib,
+        tongue: ev.tongue, scoop: ev.scoop, fall: ev.fall, swell: ev.swell, taper: ev.taper,
       });
       if (ev.voice === "keys") v.piano(t0, ev.m, { vol: .05 * ev.acc * p.piano, decay: Math.max(.5, len * 2) });
       if (ev.voice === "piano") ev.notes.forEach((m, j) => v.piano(t0 + .006 * (rnd(ev.e * 13) - .3) + j * .006, m, { vol: .03 * ev.acc * p.piano, decay: ev.len > 2 ? 1 : .6 }));

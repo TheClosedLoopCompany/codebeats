@@ -1,11 +1,15 @@
 // AudioWorklet: the tenor sax's tone generator. A sax is a conical tube, and a cone driven by a reed makes the
 // mouthpiece pressure jump between two levels: a short "open" pulse and a longer "closed" stretch each cycle
 // (a clarinet's cylinder gives a square wave instead — odd harmonics only, which is why it sounds hollow).
-// The pulse is a fixed fraction of the period — set by how much of the cone the mouthpiece cuts off, so it widens
-// in the upper register — and gives the sax its full, reedy harmonic series. Blowing harder sharpens the pulse
+// The pulse lasts about the same time whatever the note (a little under a millisecond: it's the reed closing), so
+// it takes up more of the cycle the higher the note; that fixed width is what puts the sax's formant-like humps in
+// the same place on every note. It gives the full, reedy harmonic series. Blowing harder sharpens the pulse
 // edges (brighter, edgier) and pushes it into soft saturation (rasp); soft playing rounds it off, breathier.
 // Air rushes through the reed each time it opens, so the breath noise comes in bursts locked to the cycle.
-// Each cycle's length jitters very slightly, and pitch and breath drift slowly: no two notes are quite the same.
+// Everything follows the one breath pressure: loudness, brightness, rasp, the air noise and the vibrato, which is
+// a pulsing of the breath as much as of the pitch. That's what makes a wind tone sound alive — the parts moving
+// together. Random, independent wobbles sound synthetic instead, so the only randomness here is slow and small:
+// each cycle's length jitters very slightly, pitch drifts, and the breath wanders a few percent over a second or so.
 //
 // Parameters: `freq` (Hz) and `pressure` (breath: below ~.35 silent, ~.65 mezzo-forte, ~.9 full) are what the player
 // automates; `vibrato` (cents) and `breath` (air noise, 0-1) set the expression.
@@ -35,7 +39,8 @@ class Reed extends AudioWorkletProcessor {
     this.dx = 0; this.dy = 0; // DC blocker
     this.amp = 0; this.bright = 0; // smoothed loudness and brightness
     this.ph = 0; this.rate = 5.2; // vibrato
-    this.drift = 0; this.wander = 0; // slow random pitch drift (cents) and breath wander
+    this.drift = 0; // slow random pitch drift (cents)
+    this.wander = 0; this.wanderTo = 0; this.wait = 0; // the breath's slow wander
     this.seed = (options?.processorOptions?.seed ?? 1) >>> 0 || 1;
     this.alive = true;
     if (this.port) this.port.onmessage = () => { this.alive = false; };
@@ -52,18 +57,19 @@ class Reed extends AudioWorkletProcessor {
     const F = p.freq, P = p.pressure, vib = p.vibrato[0], air = p.breath[0], sr = sampleRate;
     for (let i = 0; i < out.length; i++) {
       const pressure = P.length > 1 ? P[i] : P[0];
-      // Expression: vibrato (mostly pitch, a little loudness, like a jaw vibrato) and slow drift.
+      // Expression: vibrato (pitch and breath together, like a jaw vibrato), slow drift and wander.
       this.ph += this.rate / sr; if (this.ph >= 1) { this.ph -= 1; this.rate = 5 + .25 * (this.rand() + 1); }
       const lfo = Math.sin(2 * Math.PI * this.ph);
       this.drift += (this.rand() * 4 - this.drift) * .00002;
-      this.wander += (this.rand() - this.wander) * .0002;
+      if (--this.wait <= 0) { this.wanderTo = this.rand(); this.wait = sr * (.4 + .4 * (this.rand() + 1)); }
+      this.wander += (this.wanderTo - this.wander) * 2 / sr;
       const f = (F.length > 1 ? F[i] : F[0]) * 2 ** ((vib * lfo + this.drift) / 1200) * this.jit;
       // How the breath pressure translates: nothing below ~.35, then louder and brighter the harder it's blown.
-      const blow = pressure * (1 + .04 * this.wander + .002 * vib * lfo);
+      const blow = pressure * (1 + .03 * this.wander + .006 * vib * lfo);
       const a = Math.max(0, Math.min(1.4, (blow - .35) / .4)), b = Math.max(0, Math.min(1.3, (blow - .4) / .4));
       this.amp += (a * Math.sqrt(a) - this.amp) * .01; this.bright += (b - this.bright) * .004;
-      // The pulse: open for `duty` of the cycle, wider for higher notes.
-      const dt = Math.min(.5, f / sr), duty = .17 + .13 * Math.max(0, Math.min(1, Math.log2(f / 110) / 2.5));
+      // The pulse: about .9 ms long, a touch shorter (brighter) blown hard; between an eighth and .42 of the cycle.
+      const dt = Math.min(.5, f / sr), duty = Math.max(.12, Math.min(.42, .0009 * f * (1 - .12 * Math.min(1, this.bright))));
       this.phase += dt;
       if (this.phase >= 1) { this.phase -= 1; this.jit = 1 + .0015 * this.rand(); this.odd ^= 1; }
       let x = (this.phase < duty ? 1 - duty : -duty) + .5 * blep(this.phase, dt) - .5 * blep((this.phase - duty + 1) % 1, dt);

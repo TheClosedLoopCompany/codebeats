@@ -215,22 +215,25 @@ export function instruments(ac, out, { random = Math.random, only } = {}) {
     // Tenor sax: a breath-driven reed tone (reed.js), played like a horn. It's one monophonic voice, so a
     // phrase is one airstream: notes that follow straight on are slurred (the pitch slides over) or, with `tongue`,
     // articulated by a quick dip in breath; after a rest it starts from silence. `dyn` is how hard it's blown
-    // (.5 soft, subtone-ish, to 1.3 honking), which is what sets its brightness and rasp. `scoop` bends up into the
-    // note (cents), `from` slides in from another note, `fall` drops that many semitones as the note ends,
-    // `swell` grows a held note (fraction of `dyn`), `vibrato` blooms on held notes.
-    sax(t, m, len, { vol = .05, dyn = 1, breath = .3, vibrato = .6, tongue = true, scoop = 0, from, fall = 0, swell = .1 } = {}) {
+    // (.35 a ghosted whisper, .5 soft, subtone-ish, to 1.3 honking), which sets its loudness, brightness and rasp.
+    // `scoop` bends up into the note (cents), `from` slides in from another note, `fall` drops that many semitones
+    // as the note ends, `swell` grows a held note and `taper` lets it die away again before the end (fractions of
+    // the breath), `vibrato` comes in late on long notes, and only some (a jazz player keeps most notes straight).
+    // A tongued note starts with a puff of air; each phrase leans the horn's "vowel" (the honk) a little differently.
+    sax(t, m, len, { vol = .05, dyn = 1, breath = .3, vibrato = .6, tongue = true, scoop = 0, from, fall = 0, swell = .1, taper = 0 } = {}) {
       if (!reed) {
         let node;
         try { node = new AudioWorkletNode(ac, "reed", { numberOfInputs: 0, outputChannelCount: [1], processorOptions: { seed: 1 + Math.floor(random() * 2 ** 30) } }); }
         catch { return; } // the worklet isn't loaded (or supported): the sax sits this one out
-        // The horn's body: a warm low-mid bump and the nasal "honk" formant, air above 6 kHz rolled off.
-        const hp = filter("highpass", 90), body = filter("peaking", 650, .8), honk = filter("peaking", 1800, 1.4), lp = filter("lowpass", 6500);
-        body.gain.value = 3; honk.gain.value = 5;
-        reed = { node, out: gain(0), end: -1, P: node.parameters.get("pressure"), F: node.parameters.get("freq"), V: node.parameters.get("vibrato"), B: node.parameters.get("breath") };
-        node.connect(hp).connect(body).connect(honk).connect(lp).connect(reed.out).connect(ch.lead);
+        // The horn's body, after measured tenor spectra: a slight low-mid warmth, then the two resonances of the
+        // player's vocal tract that colour the tone (around 1.6-1.8 and 2.5 kHz), air above 6 kHz rolled off.
+        const hp = filter("highpass", 90), body = filter("peaking", 650, .8), honk = filter("peaking", 1750, 1.3), edge = filter("peaking", 2500, 1.5), lp = filter("lowpass", 6500);
+        body.gain.value = 1.5; honk.gain.value = 5; edge.gain.value = 3;
+        reed = { node, out: gain(0), end: -1, P: node.parameters.get("pressure"), F: node.parameters.get("freq"), V: node.parameters.get("vibrato"), B: node.parameters.get("breath"), honk };
+        node.connect(hp).connect(body).connect(honk).connect(edge).connect(lp).connect(reed.out).connect(ch.lead);
       }
-      const { P, F, V, B, out } = reed, fx = f(m), end = t + len, legato = t - reed.end < .05;
-      const blow = Math.min(.9, Math.max(.5, .6 + .15 * dyn)); // silent below ~.35, full around .9
+      const { P, F, V, B, honk, out } = reed, fx = f(m), end = t + len, legato = t - reed.end < .05;
+      const blow = Math.min(.9, Math.max(.48, .38 + .38 * dyn)); // silent below ~.35, full around .9
       const bend = from !== undefined ? f(from) : scoop ? fx * 2 ** (-scoop / 1200) : 0;
       if (legato) {
         P.cancelScheduledValues(t - .015); F.cancelScheduledValues(t - .015); // the last note doesn't stop after all
@@ -241,12 +244,15 @@ export function instruments(ac, out, { random = Math.random, only } = {}) {
       } else {
         F.setValueAtTime(bend || fx, t); if (bend) F.setTargetAtTime(fx, t + .01, .03);
         P.setValueAtTime(0, t); P.setTargetAtTime(Math.min(.9, blow * 1.06), t, .01); P.setTargetAtTime(blow, t + .05, .05);
+        honk.frequency.setTargetAtTime(1600 + 300 * random(), t, .6); honk.gain.setTargetAtTime(3 + 4 * random(), t, .6);
       }
       if (len > .4 && swell) P.setTargetAtTime(Math.min(.9, blow * (1 + swell)), t + .08, len / 2.5);
+      if (len > .4 && taper) P.setTargetAtTime(Math.max(.4, blow * (1 - taper)), end - len * .4, len * .15);
       out.gain.setTargetAtTime(vol * 2.2, t, .02); // loudness itself comes from how hard it is blown
-      B.setTargetAtTime(breath, t, .02);
+      if (tongue || !legato) { B.setTargetAtTime(Math.min(1, breath * 2 + .1), t - .004, .002); B.setTargetAtTime(breath, t + .012, .02); }
+      else B.setTargetAtTime(breath, t, .02);
       V.setTargetAtTime(0, t, .03);
-      if (len > .3 && vibrato) V.setTargetAtTime(vibrato * 18, t + Math.min(.3, len * .4), .15);
+      if (len > .5 && vibrato) V.setTargetAtTime(vibrato * 18, t + Math.min(len * .5, .3 + .25 * random()), .12);
       // Stop blowing at the end (cancelled if the next note carries straight on); a fall lets the pitch drop away.
       P.setTargetAtTime(0, end, fall ? .07 : .015);
       if (fall) F.setTargetAtTime(fx * 2 ** (-fall / 12), end - .03, .08);
